@@ -10,4 +10,4 @@ VALID_TOPICS: List[str] = [
 GOOGLE_NEWS_BASE_URL = "https://news.google.com/rss/headlines/section/topic/"
 
 # Article Limits
-ARTICLES_PER_TOPIC = 2
+ARTICLES_PER_TOPIC = 5
