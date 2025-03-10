@@ -1,0 +1,3 @@
+proccess sections with only one link
+paralel rpocesing of sections/topics
+windows scheduled script run? learn more abt this

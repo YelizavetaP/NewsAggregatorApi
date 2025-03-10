@@ -12,7 +12,8 @@ from langchain_openai import ChatOpenAI
 from config import (
     GOOGLE_NEWS_BASE_URL,
     VALID_TOPICS,
-    ARTICLES_PER_TOPIC
+    ARTICLES_PER_TOPIC,
+    VALID_GEO_LOCATIONS
 )
 
 import os
@@ -82,7 +83,19 @@ def get_summary(story_contents, story_headlines):
     summary = llm.invoke(
         [
             SystemMessage(
-                content="""Create a summary in 500 words of the story based on the content provided that captures the key points from multiple related news articles."""),
+                # content="""Create a summary in 500 words of the story based on the content provided that captures the key points from multiple related news articles."""),
+                
+                content="""You are writing a newsletter on global news to inform on a daily basis a young audience just like a journalist would do, 
+                targeting people age between 18 and 26 years old. Provide a neutral and unbiased summary in 500 words maximum, 
+                focusing on key events and decisions, exclusively from the news articles and content provided to you. 
+                Avoid any personal opinions or speculative language. Remain factual and evidence based on providing your news summary. 
+                Use quotes mentioned in these articles. Ensure the news summary is balanced, presenting multiple perspectives where relevant, and stick to factual information. 
+                Take an educational tone, and do not use any sensational writing tone. You can sometimes use humour, sarcasm and be witty. 
+                Include a short introduction and a short conclusion in the news summary. 
+                Highlight any national or international implications or reactions or controversy to these developments. 
+                The news summary should be concise and informative, 
+                suitable for a young audience seeking an objective yet entertaining overview of current news
+                Do not add any markdown formating symbols"""),
             HumanMessage(content=combined_text),
         ]
     )
@@ -94,31 +107,37 @@ def get_summary(story_contents, story_headlines):
         # print(type(headline))
         combined_headlines += ', ' + headline
 
-    headline = llm.invoke(
-        [
-            SystemMessage(
-                content="""Create a headline for the story based on the provided headline examples. Do not add any aditional formating symbols at the begining and the end."""),
-            HumanMessage(content=combined_headlines),
-        ]
-    )
-
     # headline = llm.invoke(
     #     [
     #         SystemMessage(
-    #             content="""Create a headline for the story based on the provided article contetnt"""),
-    #         HumanMessage(content=summary.content),
+    #             content="""Create a headline for the story based on the provided headline examples. Do not add any aditional formating symbols at the begining and the end."""),
+    #         HumanMessage(content=combined_headlines),
     #     ]
     # )
+
+    headline = llm.invoke(
+        [
+            SystemMessage(
+                content="""Create a catchy headline for your news summary."""),
+            HumanMessage(content=summary.content),
+        ]
+    )
 
 
     return summary.content, headline.content
 
 
 
-def get_rss_feed(topic: str):
+def get_rss_feed(query: str):
         """Fetch RSS feed for a specific topic using BeautifulSoup"""
         try:
-            url = f"{GOOGLE_NEWS_BASE_URL}{topic}"
+            if query in VALID_TOPICS:
+                url = f"{GOOGLE_NEWS_BASE_URL}topic/{query}"
+            elif query in VALID_GEO_LOCATIONS:
+                url = f"{GOOGLE_NEWS_BASE_URL}geo/{query}"   
+           
+
+            # url = f"{GOOGLE_NEWS_BASE_URL}{query}"
 
             print('-'*20)
             print(f"Fetching RSS feed from: {url}")
@@ -134,10 +153,10 @@ def get_rss_feed(topic: str):
 
             items = soup.find_all('item')
             if not items:
-                print(f"No entries found in RSS feed for topic: {topic}")
+                print(f"No entries found in RSS feed for topic: {query}")
                 return None
 
-            data = {'topic': topic, 'articles': []}
+            data = {'topic': query, 'articles': []}
             for item in items[:ARTICLES_PER_TOPIC]:
 
                 story = []
@@ -148,10 +167,43 @@ def get_rss_feed(topic: str):
                 description = item.description.text if item.description else ''
                 desc_soup = BeautifulSoup(description, 'html.parser')
 
+
+                # for li in desc_soup.find_all('li'):
+
+
+                #     encoded_link = li.find('a')['href']
+                #     publisher = li.find('font').text.strip() if li.find('font') else 'Unknown'
+
+                #     # save all the headlines
+                #     headline = li.text.strip()
+                #     story_headlines.append(headline)
+
+
+                #     # save all the urls
+                #     decoded_url = url_decode(encoded_link)
+                #     story_urls.append(decoded_url)
+
+                #     # save all the contents
+                #     # mb change to combined text
+                #     article_content = extract_article_content(decoded_url)
+                #     story_contents.append(article_content)
+
+
+                # for li in desc_soup.find_all('li'):
+                for a in desc_soup.find_all('a'):
+
+                    encoded_link =  a['href']
+
+                    decoded_url = url_decode(encoded_link)
+                    story_urls.append(decoded_url)
+
+                    article_content = extract_article_content(decoded_url)
+                    story_contents.append(article_content)
+
                 for li in desc_soup.find_all('li'):
 
-                    encoded_link = li.find('a')['href']
-                    publisher = li.find('font').text.strip() if li.find('font') else 'Unknown'
+                    # encoded_link = li.find('a')['href']
+                    # publisher = li.find('font').text.strip() if li.find('font') else 'Unknown'
 
                     # save all the headlines
                     headline = li.text.strip()
@@ -159,13 +211,13 @@ def get_rss_feed(topic: str):
 
 
                     # save all the urls
-                    decoded_url = url_decode(encoded_link)
-                    story_urls.append(decoded_url)
+                    # decoded_url = url_decode(encoded_link)
+                    # story_urls.append(decoded_url)
 
                     # save all the contents
                     # mb change to combined text
-                    article_content = extract_article_content(decoded_url)
-                    story_contents.append(article_content)
+                    # article_content = extract_article_content(decoded_url)
+                    # story_contents.append(article_content)
 
                 print('Starting summary generation')
                 story_summary, story_headline = get_summary(story_contents, story_headlines)
@@ -182,7 +234,7 @@ def get_rss_feed(topic: str):
                     # data.append({'section': story})
                     data['articles'].append(story)
 
-                print(f"Successfully fetched {len(data)} sections for topic: {topic}")
+                print(f"Successfully fetched {len(data['articles'])} sections for topic: {query}")
 
             return data
 
@@ -190,24 +242,37 @@ def get_rss_feed(topic: str):
             print(f"HTTP request error: {str(e)}")
             return None
         except Exception as e:
-            print(f"Error fetching RSS feed for topic {topic}: {str(e)}")
+            print(f"Error fetching RSS feed for topic {query}: {str(e)}")
             return None
 
 
 
 
-def get_topic_news(topic: str):
+def get_topic_news(query: str):
         """Get news for a specific topic"""
-        print(f"Fetching news for topic: {topic}")
+        print(f"Fetching news for query: {query}")
 
-        if topic not in VALID_TOPICS:
-            print(f"Invalid topic requested: {topic}")
-            return {"error": "Invalid topic"}
+        # if query not in VALID_TOPICS:
+        #     print(f"Invalid topic requested: {query}")
+        #     return {"error": "Invalid topic"}
+        
+        # if query not in VALID_GEO_LOCATIONS:
+        #     print(f"Invalid topic requested: {query}")
+        #     return {"error": "Invalid topic"}
 
-        result = get_rss_feed(topic)
+        # result = get_rss_feed(query)
+
+
+        if query in VALID_TOPICS:
+            result = get_rss_feed(query)
+        elif query in VALID_GEO_LOCATIONS:
+            result = get_rss_feed(query)   
+        else:
+            print(f"Invalid requested: {query}")
+            return {"error": "Invalid query"}
 
         if not result:
-            print(f"Failed to fetch RSS feed for topic: {topic}\nValid topics are: {VALID_TOPICS}")
+            print(f"Failed to fetch RSS feed for query: {query}\nValid topics are: {VALID_TOPICS}\nValid locations are: {VALID_GEO_LOCATIONS}")
             return {"error": "Failed to fetch RSS feed"}
 
         return result

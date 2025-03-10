@@ -118,8 +118,8 @@ def format_email(content):
     return html_content
 
 
-# def send_email(content, receiver='liz47220@gmail.com'):
-def send_email(content, receiver='dafstar@zebratruth.com'):
+def send_email(content, receiver='liz47220@gmail.com'):
+# def send_email(content, receiver='dafstar@zebratruth.com'):
 
     try:
         html_content = format_email(content)
